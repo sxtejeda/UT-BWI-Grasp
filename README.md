@@ -1,9 +1,13 @@
 # UT-BWI-Grasp
 
-The purpose of this package is twofold: first, we would like to change the BWIBot's arm to use gpd instead of agile grasp. Second, we would
-like to train the neural network that gpd uses in order to better fit our arm's specifications.
+This package provides a demo to use GPD instead of agile grasp when grasping objects on the arm.
 
-To Do:
-- write a package that runs GPD with MoveIt to pick up objects and stores the grasps that it tried along with their success state
-- collect data by running this package multiple times on multiple objects
-- train the network with the data
+To launch this demo:
+1. launch arm
+2. launch xtion
+3. roslaunch gpd tutorial1.launch
+4. rosrun bwi\_grasp convert\_grasp
+5. rosrun segbot\_arm\_perception table\_object\_detection\_node
+6. rosrun bwi\_grasp bwi\_grasp
+
+
