@@ -186,7 +186,6 @@ void fingers_cb (const kinova_msgs::FingerPosition msg) {
 
 void grasps_cb(const bwi_grasp::GraspWithScoreList &msg){
 	current_grasps = msg;
-	ROS_INFO_STREAM("Found " << current_grasps.grasps.size() << " current grasps");	
 	heardGrasps = true;
 }
 
@@ -210,7 +209,6 @@ void listenForGrasps(float rate){
 	
 	while (ros::ok()){
 		ros::spinOnce();
-		
 		if (heardGrasps) {
 			ROS_INFO_STREAM("Listen for grasps terminating");
             return;
@@ -485,7 +483,8 @@ void cartesianVelocityMove(double dx, double dy, double dz, double duration){
 
 //lifts ef specified distance
 void lift_velocity(double vel, double distance){
-	ros::Rate r(4);
+	double pubRate = 40.0;
+	ros::Rate r(pubRate);
 	ros::spinOnce();
 	double distance_init = .2;
 	kinova_msgs::PoseVelocity T;
@@ -495,7 +494,7 @@ void lift_velocity(double vel, double distance){
 	T.twist_angular_y= 0.0;
 	T.twist_angular_z= 0.0;
 
-	for(int i = 0; i < std::abs(distance/vel/.25); i++){
+	for(int i = 0; i < std::abs(pubRate*distance/vel); i++){
 		ros::spinOnce();
 		if(distance > 0)
 			T.twist_linear_z = vel;
@@ -506,9 +505,30 @@ void lift_velocity(double vel, double distance){
 	}
 	T.twist_linear_z= 0.0;
 	pub_velocity.publish(T);
-	
-	
 }
+
+void move_with_cartesian_velocities(const kinova_msgs::PoseVelocity &velocities, const double seconds) {
+    // Per the Kinova documentation, we have to publish at exactly 100Hz to get
+    // predictable behavior
+    ros::Rate r(100);
+
+    ros::Time end = ros::Time::now() + ros::Duration(seconds);
+    while (ros::ok()) {
+        //collect messages
+        ros::spinOnce();
+
+        //publish velocity message
+        pub_velocity.publish(velocities);
+        r.sleep();
+        if (ros::Time::now() > end) {
+            break;
+        }
+    }
+    kinova_msgs::PoseVelocity zeros;
+    pub_velocity.publish(zeros);
+
+}
+
 
 void lift(ros::NodeHandle n, double x){
 	listenForArmData(30.0);
@@ -542,6 +562,7 @@ int main(int argc, char **argv) {
 	//publish velocities
 	pub_velocity = n.advertise<kinova_msgs::PoseVelocity>("/m1n6s200_driver/in/cartesian_velocity", 10);
 	
+	
 	//publish pose array
 	pose_array_pub = n.advertise<geometry_msgs::PoseArray>("/agile_grasp_demo/pose_array", 10);
 	
@@ -558,14 +579,22 @@ int main(int argc, char **argv) {
 	
 	//register ctrl-c
 	signal(SIGINT, sig_handler);
-
+	std::string joint_state_topic = "/m1n6s200_driver/out/joint_state";
+	while (true) {
+	boost::shared_ptr<const sensor_msgs::JointState> result = ros::topic::waitForMessage<sensor_msgs::JointState>(joint_state_topic, n, ros::Duration(5.0));
+		if (result) {
+			break;
+		}
+		ROS_WARN("Could not read joint states, retrying...");	
+	}
 	
 	//user input
     char in;
 	
-	
+
 	
 	ROS_INFO("Demo starting...move the arm to a position where it is not occluding the table.");
+	//TODO This is where we have to change the file
 	pressEnter();
 	
 	
@@ -788,28 +817,22 @@ int main(int argc, char **argv) {
 	
 	//lift for a while
 	//pressEnter();
-
-	//LIFT action
+    	ROS_INFO_STREAM("Attempting to lift...");
+	
+	kinova_msgs::PoseVelocity velocities;
+	velocities.twist_linear_z = .2;
+	move_with_cartesian_velocities(velocities, 3);
+	//lift_velocity(0.2,5.0); 
 	
 	//we need to call angular velocity control before we can do cartesian control right after using the fingers
-    ROS_INFO_STREAM("Waiting for 10.0s before lifting");
-    spinSleep(10.0); // sam added this
-    ROS_INFO_STREAM("Lifting...");
-	lift(n,0.065);
-    ROS_INFO_STREAM("How did I do?");
-	spinSleep(0.5);
-	lift(n,-0.05); 
 	segbot_arm_manipulation::openHand();
 	
-	//MOVE BACK
-	lift(n,0.05); 
+	//TODO actually give velocity commands instead of calling lift
 	
 	//moveToPoseMoveIt(n,pose_outofview);
 	//moveToPoseMoveIt(n,pose_outofview);
 
 	segbot_arm_manipulation::homeArm(n);
-
-    spinSleep(10.0); // sam added this
 
 	segbot_arm_manipulation::moveToJointState(n,joint_state_outofview);
 	segbot_arm_manipulation::moveToJointState(n,joint_state_outofview);

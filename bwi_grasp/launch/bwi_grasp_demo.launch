@@ -1,0 +1,8 @@
+<launch>
+	<!-- <include file="$(find segbot_arm_launch)/launch/segbot_v2.arm.launch" /> -->
+	<include file="$(find segbot_arm_launch)/launch/xtion.launch" />
+	<include file="$(find gpd)/launch/tutorial1.launch" />
+	<node name="table_object_detection_node" pkg="segbot_arm_perception" type="table_object_detection_node" />
+	<node name="convert_grasp" pkg="bwi_grasp" type="convert_grasp" />
+	<node name="bwi_grasp_node" pkg="bwi_grasp" type="bwi_grasp_node" />
+</launch>
